@@ -1,0 +1,42 @@
+name: financial_manager
+description: A financial management application with dashboard, cash flow tracking, and reporting.
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  firebase_core: ^2.13.0
+  cloud_firestore: ^4.8.1
+  firebase_auth: ^4.6.0
+  charts_flutter: ^0.12.0
+  flutter_staggered_grid_view: ^0.6.2
+  flutter_form_builder: ^8.4.0
+  pdf: ^3.10.4
+  excel: ^4.4.0
+  path_provider: ^2.0.15
+  fluttertoast: ^8.2.1
+  intl: ^0.18.1
+  shared_preferences: ^2.2.2
+  http: ^0.13.5
+  workmanager: ^0.5.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  flutter_localizations:
+    sdk: flutter
+
+  assets:
+    - assets/images/
+    - assets/images/
