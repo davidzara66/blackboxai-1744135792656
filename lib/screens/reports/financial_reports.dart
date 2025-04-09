@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:financial_manager/services/database_service.dart';
 import 'package:financial_manager/services/export_service.dart';
 import 'package:financial_manager/models/sale_purchase_model.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:flutter_charts/flutter_charts.dart';
 
 class FinancialReportsScreen extends StatelessWidget {
   const FinancialReportsScreen({super.key});
@@ -15,50 +15,56 @@ class FinancialReportsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Financial Reports'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            onPressed: () => _exportReport(context, format: 'pdf'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.grid_on),
-            onPressed: () => _exportReport(context, format: 'excel'),
-          ),
-        ],
+        title: Text(LocalizationService.of(context).translate('reports')),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            SizedBox(
-              height: 300,
+      body: Column(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
               child: StreamBuilder<List<SalePurchase>>(
                 stream: Provider.of<DatabaseService>(context).getSalesPurchases(),
                 builder: (context, snapshot) {
                   if (snapshot.hasData) {
-                    return SfCartesianChart(
-                      title: ChartTitle(text: 'Sales vs Purchases (Last 30 Days)'),
-                      legend: Legend(isVisible: true),
-                      series: <ChartSeries>[
-                        ColumnSeries<Map<String, dynamic>, DateTime>(
-                          dataSource: _prepareData(snapshot.data!),
-                          xValueMapper: (data, _) => data['date'],
-                          yValueMapper: (data, _) => data['sales'],
-                          name: 'Sales',
-                          color: Colors.green,
+                    return Container(
+                      height: 300,
+                      padding: EdgeInsets.all(8),
+                      child: Chart(
+                        data: _prepareChartData(snapshot.data!),
+                        behaviors: [
+                          LegendBehavior(
+                            position: LegendPosition.top,
+                            textStyle: TextStyle(fontSize: 12),
+                          ),
+                          ChartTitleBehavior(
+                            title: 'Sales vs Purchases (Last 30 Days)',
+                            textStyle: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold
+                            ),
+                          ),
+                          XAxisTitleBehavior(title: 'Date'),
+                          YAxisTitleBehavior(title: 'Amount (\$)'),
+                        ],
+                        xAxis: DateTimeAxis(
+                          tickInterval: 5,
+                          tickLabelStyle: TextStyle(fontSize: 10),
                         ),
-                        ColumnSeries<Map<String, dynamic>, DateTime>(
-                          dataSource: _prepareData(snapshot.data!),
-                          xValueMapper: (data, _) => data['date'],
-                          yValueMapper: (data, _) => data['purchases'],
-                          name: 'Purchases',
-                          color: Colors.red,
+                        yAxis: LinearAxis(
+                          tickLabelStyle: TextStyle(fontSize: 10),
                         ),
-                      ],
-                      primaryXAxis: DateTimeAxis(
-                        intervalType: DateTimeIntervalType.days,
-                        interval: 5,
+                        series: [
+                          BarSeries(
+                            id: 'sales',
+                            color: Colors.green[400]!,
+                            displayName: 'Sales',
+                          ),
+                          BarSeries(
+                            id: 'purchases',
+                            color: Colors.red[400]!,
+                            displayName: 'Purchases',
+                          ),
+                        ],
                       ),
                     );
                   }
@@ -66,36 +72,64 @@ class FinancialReportsScreen extends StatelessWidget {
                 },
               ),
             ),
-            const SizedBox(height: 20),
-            // Additional reports can be added here
-          ],
-        ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton(
+                  onPressed: () => _exportReport(context, format: 'pdf'),
+                  child: const Text('Export PDF'),
+                ),
+                ElevatedButton(
+                  onPressed: () => _exportReport(context, format: 'excel'),
+                  child: const Text('Export Excel'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  List<Map<String, dynamic>> _prepareData(List<SalePurchase> transactions) {
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+  ChartData _prepareChartData(List<SalePurchase> transactions) {
+    final chartData = ChartData();
+    final thirtyDaysAgo = DateTime.now().subtract(Duration(days: 30));
     final recentTransactions = transactions.where((t) => t.date.isAfter(thirtyDaysAgo));
     
-    final Map<DateTime, Map<String, double>> data = {};
+    // Group transactions by day
+    final dailyData = <DateTime, Map<String, double>>{};
     
     for (final t in recentTransactions) {
       final date = DateTime(t.date.year, t.date.month, t.date.day);
-      data.putIfAbsent(date, () => {'sales': 0, 'purchases': 0});
+      dailyData.putIfAbsent(date, () => {'sales': 0, 'purchases': 0});
       
       if (t.type == TransactionType.sale) {
-        data[date]!['sales'] = data[date]!['sales']! + t.total;
+        dailyData[date]!['sales'] = dailyData[date]!['sales']! + t.amount;
       } else {
-        data[date]!['purchases'] = data[date]!['purchases']! + t.total;
+        dailyData[date]!['purchases'] = dailyData[date]!['purchases']! + t.amount;
       }
     }
-
-    return data.entries.map((e) => {
-      'date': e.key,
-      'sales': e.value['sales'],
-      'purchases': e.value['purchases'],
-    }).toList();
+    
+    // Convert to ChartDatum format
+    dailyData.forEach((date, values) {
+      chartData.addAll([
+        ChartDatum(
+          x: date,
+          y: values['sales']!,
+          seriesId: 'sales'
+        ),
+        ChartDatum(
+          x: date,
+          y: values['purchases']!,
+          seriesId: 'purchases'
+        )
+      ]);
+    });
+    
+    return chartData;
   }
 
   Future<void> _exportReport(BuildContext context, {required String format}) async {
